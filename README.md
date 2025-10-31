@@ -66,8 +66,45 @@
 
 ## 文件说明
 
+- `index.html` - GitHub Pages 入口文件（与 brash_poc.html 内容相同）
 - `brash_poc.html` - 主要的 PoC HTML 文件，包含完整的攻击代码和 UI 界面
 - `README.md` - 本说明文件
+- `.github/workflows/pages.yml` - GitHub Actions 自动部署工作流
+
+## GitHub Pages 部署
+
+### 在线访问
+
+项目已配置 GitHub Pages，可以通过以下链接访问：
+
+**Demo 链接**: https://ygcaicn.github.io/Brash/
+
+### 启用步骤
+
+1. **推送代码到 GitHub**（如果还没推送）:
+   ```bash
+   git add .
+   git commit -m "配置 GitHub Pages"
+   git push origin main
+   ```
+
+2. **在 GitHub 仓库中启用 Pages**:
+   - 进入仓库页面，点击 **Settings**
+   - 在左侧菜单中找到 **Pages**
+   - 在 **Source** 部分，选择 **GitHub Actions**
+   - 保存设置
+
+3. **自动部署**:
+   - GitHub Actions 会在每次推送到 `main` 分支时自动部署
+   - 首次部署可能需要几分钟时间
+   - 部署完成后即可通过上述链接访问
+
+### 手动触发部署
+
+如果需要手动触发部署：
+- 进入仓库的 **Actions** 标签页
+- 选择 **Deploy to GitHub Pages** 工作流
+- 点击 **Run workflow** 按钮
 
 ## 研究目的
 
