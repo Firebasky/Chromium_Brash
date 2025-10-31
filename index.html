@@ -47,6 +47,19 @@
             background-color: #6c757d;
             cursor: not-allowed;
         }
+        .btn-github {
+            background-color: #24292e;
+            color: white;
+        }
+        .btn-github:hover {
+            background-color: #171a1d;
+        }
+        .btn-github::before {
+            content: "📂 ";
+        }
+        a {
+            text-decoration: none;
+        }
         .status {
             margin-top: 15px;
             padding: 10px;
@@ -74,6 +87,9 @@
         <h3>Brash漏洞PoC控制面板</h3>
         <button id="startBtn" onclick="startAttack()">开始攻击</button>
         <button id="stopBtn" onclick="stopAttack()" disabled>停止攻击</button>
+        <a href="https://github.com/ygcaicn/Brash" target="_blank" rel="noopener noreferrer">
+            <button class="btn-github">查看源码</button>
+        </a>
         
         <div class="status" id="status">
             状态: 就绪
